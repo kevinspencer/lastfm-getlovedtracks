@@ -1,0 +1,72 @@
+#!/usr/bin/env perl
+# Copyright 2008-2016 Kevin Spencer <kevin@kevinspencer.org>
+#
+# Permission to use, copy, modify, distribute, and sell this software and its
+# documentation for any purpose is hereby granted without fee, provided that
+# the above copyright notice appear in all copies and that both the
+# copyright notice and this permission notice appear in supporting
+# documentation.  No representations are made about the suitability of this
+# software for any purpose.  It is provided "as is" without express or 
+# implied warranty.
+#
+################################################################################
+#
+# Uses the last.fm API (http://www.last.fm/api/intro) to find my most recently
+# listened to tracks.  Requires a last.fm API key.
+#
+################################################################################
+
+use Data::Dumper;
+use Getopt::Long;
+use JSON::XS;
+use LWP::UserAgent;
+use URI;
+use strict;
+use warnings;
+
+our $VERSION = '0.4';
+
+$Data::Dumper::Indent = 1;
+
+my ($track_count, $lastfm_user);
+GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user);
+
+die "No user provided, lastfm-myrecent --user oldmanrivers\n" if (! $lastfm_user);
+
+my $api_key = $ENV{LFM_API_KEY} or die "No last.fm API key found\n";
+
+# how many tracks should we retrieve?
+$track_count ||= 3;
+
+# no user serviceable params below this point
+
+my $api_url = 'http://ws.audioscrobbler.com/2.0/';
+my $uri = URI->new($api_url);
+my %params = (
+    api_key => $api_key,
+    method  => 'user.GetRecentTracks',
+    user    => $lastfm_user,
+    limit   => $track_count,
+    format  => 'json'
+);
+$uri->query_form(%params);
+
+my $ua = LWP::UserAgent->new();
+$ua->agent('getmyrecent/' . $VERSION);
+my $response = $ua->get($uri);
+if (! $response->is_success()) {
+    die "Error when communicating with $api_url: " . 
+        $response->status_line(), "\n";
+}
+
+my $data = decode_json($response->content());
+if ($data->{error}) {
+    # we received an error from last.fm...
+    die "ERROR $data->{error}: $data->{message}\n";
+}
+
+
+for my $track_info (@{$data->{recenttracks}{track}}) {
+    next if (! $track_info->{date}{'#text'}); # still playing?
+    print $track_info->{artist}{'#text'} . ' - ' . $track_info->{name} . ' - ' . $track_info->{date}{'#text'}, "\n";
+}
