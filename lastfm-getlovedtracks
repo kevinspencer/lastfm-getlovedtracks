@@ -24,14 +24,14 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.4';
+our $VERSION = '0.1';
 
 $Data::Dumper::Indent = 1;
 
 my ($track_count, $lastfm_user);
 GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user);
 
-die "No user provided, lastfm-myrecent --user oldmanrivers\n" if (! $lastfm_user);
+die "No user provided, lastfm-getlovedtracks --user oldmanrivers\n" if (! $lastfm_user);
 
 my $api_key = $ENV{LFM_API_KEY} or die "No last.fm API key found\n";
 
@@ -44,7 +44,7 @@ my $api_url = 'http://ws.audioscrobbler.com/2.0/';
 my $uri = URI->new($api_url);
 my %params = (
     api_key => $api_key,
-    method  => 'user.GetRecentTracks',
+    method  => 'user.getlovedtracks',
     user    => $lastfm_user,
     limit   => $track_count,
     format  => 'json'
@@ -60,6 +60,10 @@ if (! $response->is_success()) {
 }
 
 my $data = decode_json($response->content());
+
+print Dumper $data;
+exit();
+
 if ($data->{error}) {
     # we received an error from last.fm...
     die "ERROR $data->{error}: $data->{message}\n";
