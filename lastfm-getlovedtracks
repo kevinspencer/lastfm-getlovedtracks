@@ -24,12 +24,12 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 $Data::Dumper::Indent = 1;
 
-my ($track_count, $lastfm_user);
-GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user);
+my ($track_count, $lastfm_user, $force);
+GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user, "force" => \$force);
 
 die "No user provided, lastfm-getlovedtracks --user oldmanrivers\n" if (! $lastfm_user);
 
@@ -39,6 +39,9 @@ my $api_key = $ENV{LFM_API_KEY} or die "No last.fm API key found\n";
 $track_count ||= 3;
 
 # no user serviceable params below this point
+
+my $last_ran_timestamp;
+my $last_ran_filename = '/Users/' . getpwuid($<) . '/.lastfm-getlovedtracks.lastran';
 
 my $api_url = 'http://ws.audioscrobbler.com/2.0/';
 my $uri = URI->new($api_url);
@@ -52,7 +55,7 @@ my %params = (
 $uri->query_form(%params);
 
 my $ua = LWP::UserAgent->new();
-$ua->agent('getmyrecent/' . $VERSION);
+$ua->agent('getlovedtracks/' . $VERSION);
 my $response = $ua->get($uri);
 if (! $response->is_success()) {
     die "Error when communicating with $api_url: " . 
@@ -60,17 +63,16 @@ if (! $response->is_success()) {
 }
 
 my $data = decode_json($response->content());
-
-print Dumper $data;
-exit();
-
 if ($data->{error}) {
     # we received an error from last.fm...
     die "ERROR $data->{error}: $data->{message}\n";
 }
 
-
-for my $track_info (@{$data->{recenttracks}{track}}) {
-    next if (! $track_info->{date}{'#text'}); # still playing?
-    print $track_info->{artist}{'#text'} . ' - ' . $track_info->{name} . ' - ' . $track_info->{date}{'#text'}, "\n";
+for my $track_info (@{$data->{lovedtracks}{track}}) {
+    if (($force) || ($track_info->{date}{uts} >= $last_ran_timestamp)) {
+        print "Loved $track_info->{name} by $track_info->{artist}{name}.  $track_info->{url}\n";
+    }
 }
+
+open(my $fh, '>', $last_ran_filename) || die "Could not create $last_ran_filename - $!\n";
+close($fh);
