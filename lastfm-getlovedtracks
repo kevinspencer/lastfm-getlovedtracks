@@ -17,6 +17,8 @@
 ################################################################################
 
 use Data::Dumper;
+use Env '@PATH';
+use File::stat;
 use Getopt::Long;
 use JSON::XS;
 use LWP::UserAgent;
@@ -24,14 +26,22 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 $Data::Dumper::Indent = 1;
 
-my ($track_count, $lastfm_user, $force);
-GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user, "force" => \$force);
+my ($track_count, $lastfm_user, $force, $twitter);
+GetOptions("count=i" => \$track_count, "user=s" => \$lastfm_user, "twitter" => \$twitter, "force" => \$force);
 
 die "No user provided, lastfm-getlovedtracks --user oldmanrivers\n" if (! $lastfm_user);
+
+my $twitter_poster = 'burdie';
+# if we're posting to twitter, ensure burdie is in our path
+if ($twitter) {
+    if (! grep -x "$_/$twitter_poster", @PATH) {
+        die "You wanted to post to Twitter but I can't find any tool to do that.\n";
+    }
+}
 
 my $api_key = $ENV{LFM_API_KEY} or die "No last.fm API key found\n";
 
@@ -40,8 +50,8 @@ $track_count ||= 3;
 
 # no user serviceable params below this point
 
-my $last_ran_timestamp;
-my $last_ran_filename = '/Users/' . getpwuid($<) . '/.lastfm-getlovedtracks.lastran';
+my $last_ran_filename  = '/Users/' . getpwuid($<) . '/.lastfm-getlovedtracks.lastran';
+my $last_ran_timestamp = -e $last_ran_filename ? stat($last_ran_filename)->mtime() : 0;
 
 my $api_url = 'http://ws.audioscrobbler.com/2.0/';
 my $uri = URI->new($api_url);
@@ -68,9 +78,15 @@ if ($data->{error}) {
     die "ERROR $data->{error}: $data->{message}\n";
 }
 
+my $loved_string;
 for my $track_info (@{$data->{lovedtracks}{track}}) {
     if (($force) || ($track_info->{date}{uts} >= $last_ran_timestamp)) {
-        print "Loved $track_info->{name} by $track_info->{artist}{name}.  $track_info->{url}\n";
+        $loved_string = "Loved $track_info->{name} by $track_info->{artist}{name}, $track_info->{url}";
+        print $loved_string, "\n";
+        # TODO: instead of shelling out, incorporate burdie code here...
+        if ($twitter) {
+            system($twitter_poster, $loved_string);
+        }
     }
 }
 
