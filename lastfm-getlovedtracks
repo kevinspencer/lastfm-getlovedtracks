@@ -26,7 +26,7 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.4';
+our $VERSION = '0.5';
 
 $Data::Dumper::Indent = 1;
 
@@ -84,17 +84,27 @@ my $loved_string;
 for my $track_info (@{$data->{lovedtracks}{track}}) {
     if (($force) || ($track_info->{date}{uts} >= $last_ran_timestamp)) {
         # if we have recent tracks, download the large image...
-        my $response  = $ua->get($track_info->{image}[3]->{'#text'}, ":content_file" => '/var/tmp/current.png');
+        my $tempfile  = '/var/tmp/' . time() . '.png';
+        my $response  = $ua->get($track_info->{image}[3]->{'#text'}, ":content_file" => $tempfile);
         $loved_string = "Loved $track_info->{name} by $track_info->{artist}{name}, $track_info->{url}";
         print $loved_string, "\n";
         # TODO: instead of shelling out, incorporate burdie code here...
         if ($twitter) {
-            my $shell_command = "$twitter_poster --sendimage /var/tmp/current.png \Q$loved_string\E";
-            #system($twitter_poster, '--sendimage /var/tmp/current.png', $loved_string);
+            my $shell_command;
+            if (! -s $tempfile) {
+                print "$tempfile does not exist, skipping image upload.\n";
+                $shell_command = "$twitter_poster \Q$loved_string\E";
+            } else {
+                $shell_command = "$twitter_poster --sendimage $tempfile \Q$loved_string\E";
+            }
             my $result = `$shell_command`;
+            print $result, "\n";
         }
     }
 }
+
+# if we're not posting to twitter, assume dry run mode and don't touch $last_ran_filename
+exit() if (! $twitter);
 
 open(my $fh, '>', $last_ran_filename) || die "Could not create $last_ran_filename - $!\n";
 close($fh);
