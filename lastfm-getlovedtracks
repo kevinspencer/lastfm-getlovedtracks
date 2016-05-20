@@ -18,6 +18,7 @@
 
 use Data::Dumper;
 use Env '@PATH';
+use File::HomeDir;
 use File::stat;
 use Getopt::Long;
 use JSON::XS;
@@ -26,7 +27,7 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.5';
+our $VERSION = '0.6';
 
 $Data::Dumper::Indent = 1;
 
@@ -50,7 +51,7 @@ $track_count ||= 3;
 
 # no user serviceable params below this point
 
-my $last_ran_filename  = '/Users/' . getpwuid($<) . '/.lastfm-getlovedtracks.lastran';
+my $last_ran_filename  = File::HomeDir->my_home() . '/.lastfm-getlovedtracks.lastran';
 my $last_ran_timestamp = -e $last_ran_filename ? stat($last_ran_filename)->mtime() : 0;
 
 my $api_url = 'http://ws.audioscrobbler.com/2.0/';
