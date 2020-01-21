@@ -27,7 +27,7 @@ use URI;
 use strict;
 use warnings;
 
-our $VERSION = '0.9';
+our $VERSION = '0.10';
 
 $Data::Dumper::Indent = 1;
 
@@ -85,28 +85,13 @@ print Dumper $data if ($debug);
 my $loved_string;
 for my $track_info (@{$data->{lovedtracks}{track}}) {
     if (($force) || ($track_info->{date}{uts} >= $last_ran_timestamp)) {
-        # at some point last.fm stopped providing usuable URLs for images and instead
-        # every single one points to 2a96cbd8b46e442fc41c2b86b821562f.png which is
-        # the 'grey star on black background' image.  shame.  so we'll test to see
-        # if the image URL they return matches that and ignore it if so...
-        my $tempfile  = '/var/tmp/' . time() . '.png';
-        if ($track_info->{image}[3]->{'#text'} !~ /2a96cbd8b46e442fc41c2b86b821562f/) {
-            my $response  = $ua->get($track_info->{image}[3]->{'#text'}, ":content_file" => $tempfile);
-        }
         $loved_string = "Loved $track_info->{name} by $track_info->{artist}{name} on last.fm, $track_info->{url}";
         print $loved_string, "\n";
         # TODO: instead of shelling out, incorporate burdie code here...
         if ($twitter) {
-            my $shell_command;
-            if (! -s $tempfile) {
-                print "$tempfile does not exist, skipping image upload.\n";
-                $shell_command = "$twitter_poster \Q$loved_string\E";
-            } else {
-                $shell_command = "$twitter_poster --sendimage $tempfile \Q$loved_string\E";
-            }
+            my $shell_command = "$twitter_poster \Q$loved_string\E";
             my $result = `$shell_command`;
             print $result, "\n";
-            unlink($tempfile);
         }
     }
 }
